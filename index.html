@@ -178,7 +178,7 @@
 <body>
 <div id="gameContainer"></div>
 <div id="loader">
-    <img class="logo" src="lite_loading.png?v=1">
+    <img class="logo" src="loading.png?v=1">
     <div class="spinner"></div>
     <div class="progress">
         <div class="progress_border_parent">
@@ -199,12 +199,12 @@
 </svg>
 </body>
 
-<script src="Build_23/UnityLoader.js"></script>
+<script src="build/UnityLoader.js"></script>
 <script>
     UnityLoader.compatibilityCheck = function (e, t, r) {
         t();
     };
-    var gameInstance = UnityLoader.instantiate("gameContainer", "Build_23/geo.json", {onProgress: UnityProgress});
+    var gameInstance = UnityLoader.instantiate("gameContainer", "build/geo.json", {onProgress: UnityProgress});
     var alertShown = false;
 
     function UnityProgress(gameInstance, progress) {
