@@ -205,6 +205,10 @@
         e.preventDefault();
         e.returnValue = "";
     });
+    window.open = function () {
+        console.log("Blocked window.open:", arguments);
+        return null;
+    };
     UnityLoader.compatibilityCheck = function (e, t, r) {
         t();
     };
