@@ -201,6 +201,10 @@
 
 <script src="build/UnityLoader.js"></script>
 <script>
+    window.addEventListener("beforeunload", function (e) {
+        e.preventDefault();
+        e.returnValue = "";
+    });
     UnityLoader.compatibilityCheck = function (e, t, r) {
         t();
     };
