@@ -191,49 +191,62 @@
 <script>
 const CHUNK_COUNT = 4;
 const CHUNK_BASE_NAME = "build/geo.data.unityweb.part"; 
-const JSON_CONFIG_URL = "build/geo.json";
+const JSON_URL = "build/geo.json";
 
 async function loadAndMergeChunks() {
-    const loader = document.querySelector("#loader");
-    const progressBar = document.querySelector(".progress");
     const progressFull = document.querySelector(".full");
-    
-    progressBar.style.display = "block";
+    document.querySelector(".progress").style.display = "block";
     document.getElementById("initial-spinner").style.display = "none";
 
     try {
-        const jsonPromise = fetch(JSON_CONFIG_URL).then(res => res.json());
+        const jsonResponse = await fetch(JSON_URL);
+        const config = await jsonResponse.json();
         
         const chunkPromises = [];
         for (let i = 1; i <= CHUNK_COUNT; i++) {
-            chunkPromises.push(fetch(`${CHUNK_BASE_NAME}${i}`).then(res => {
-                if (!res.ok) throw new Error(`Chunk ${i} failed`);
-                return res.blob();
-            }));
+            chunkPromises.push(fetch(`${CHUNK_BASE_NAME}${i}`).then(res => res.blob()));
         }
 
-        const [config, ...chunkBlobs] = await Promise.all([jsonPromise, ...chunkPromises]);
-        
-        progressFull.style.width = `50%`;
-
+        const chunkBlobs = await Promise.all(chunkPromises);
         const finalBlob = new Blob(chunkBlobs, { type: "application/octet-stream" });
         const blobUrl = URL.createObjectURL(finalBlob);
-        
-        console.log("Chunks merged. Overriding JSON dataUrl...");
-        config.dataUrl = blobUrl;
 
-        initUnity(config);
+        config.dataUrl = blobUrl;
+        const modifiedJsonString = JSON.stringify(config);
+
+        const realXHR = window.XMLHttpRequest;
+        window.XMLHttpRequest = function() {
+            const xhr = new realXHR();
+            const originalOpen = xhr.open;
+
+            xhr.open = function(method, url) {
+                if (url.indexOf("geo.json") > -1) {
+                    Object.defineProperty(xhr, 'responseText', { writable: true, value: modifiedJsonString });
+                    Object.defineProperty(xhr, 'status', { writable: true, value: 200 });
+                    Object.defineProperty(xhr, 'readyState', { writable: true, value: 4 });
+                    
+                    setTimeout(() => {
+                        if (xhr.onload) xhr.onload();
+                        if (xhr.onreadystatechange) xhr.onreadystatechange();
+                    }, 1);
+                    
+                    xhr.send = function() {}; 
+                }
+                return originalOpen.apply(xhr, arguments);
+            };
+            return xhr;
+        };
+
+        initUnity(JSON_URL);
         
     } catch (err) {
         console.error("Initialization failed:", err);
-        alert("Critical Error: Could not assemble game files.");
     }
 }
 
-function initUnity(configObject) {
+function initUnity(jsonPath) {
     UnityLoader.compatibilityCheck = function (e, t, r) { t(); };
-    
-    var gameInstance = UnityLoader.instantiate("gameContainer", configObject, {
+    var gameInstance = UnityLoader.instantiate("gameContainer", jsonPath, {
         onProgress: UnityProgress
     });
 }
@@ -242,11 +255,9 @@ var alertShown = false;
 function UnityProgress(gameInstance, progress) {
     const loader = document.querySelector("#loader");
     let percent_progress = 50 + (progress * 50);
-
     if (!gameInstance.progress) {
         gameInstance.progress = document.querySelector(".full");
     }
-
     gameInstance.progress.style.width = `${percent_progress}%`;
 
     if (percent_progress >= 85 && !alertShown) {
@@ -255,9 +266,7 @@ function UnityProgress(gameInstance, progress) {
     }
 
     if (progress === 1 && !gameInstance.removeTimeout) {
-        gameInstance.removeTimeout = setTimeout(function () {
-            loader.style.display = "none";
-        }, 2000);
+        gameInstance.removeTimeout = setTimeout(() => { loader.style.display = "none"; }, 2000);
     }
 }
 
