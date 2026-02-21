@@ -33,87 +33,77 @@
 
 <script src="build/UnityLoader.js"></script>
 <script>
-    const CHUNK_COUNT = 4;
-    const CHUNK_BASE_NAME = "build/geo.data.unityweb.part";
+const CHUNK_COUNT = 4;
+const CHUNK_BASE_NAME = "build/geo.unityweb.part"; 
 
-    async function loadAndMergeChunks() {
-        const loader = document.querySelector("#loader");
-        const progressBar = document.querySelector(".progress");
-        const progressFull = document.querySelector(".full");
-        
-        progressBar.style.display = "block";
-        document.getElementById("initial-spinner").style.display = "none";
+async function loadAndMergeChunks() {
+    const loader = document.querySelector("#loader");
+    const progressBar = document.querySelector(".progress");
+    const progressFull = document.querySelector(".full");
+    
+    progressBar.style.display = "block";
+    document.getElementById("initial-spinner").style.display = "none";
 
-        const chunks = [];
-        
-        try {
-            for (let i = 1; i <= CHUNK_COUNT; i++) {
-                const response = await fetch(`${CHUNK_BASE_NAME}${i}`);
-                if (!response.ok) throw new Error(`Failed to load chunk ${i}`);
-                
-                const reader = response.body.getReader();
-                const contentLength = +response.headers.get('Content-Length');
-                
-                let receivedLength = 0;
-                let chunkData = new Uint8Array(contentLength);
-                
-                while(true) {
-                    const {done, value} = await reader.read();
-                    if (done) break;
-                    chunkData.set(value, receivedLength);
-                    receivedLength += value.length;
-                    
-                    // Update progress bar (0 to 50% for downloading)
-                    let chunkProgress = (i - 1) / CHUNK_COUNT + (receivedLength / contentLength) / CHUNK_COUNT;
-                    progressFull.style.width = `${chunkProgress * 50}%`; 
-                }
-                chunks.push(chunkData);
-            }
+    const chunkBlobs = [];
+    
+    try {
+        for (let i = 1; i <= CHUNK_COUNT; i++) {
+            const response = await fetch(`${CHUNK_BASE_NAME}${i}`);
+            if (!response.ok) throw new Error(`Failed to load chunk ${i}`);
 
-            const mergedBlob = new Blob(chunks, { type: "application/octet-stream" });
-            const blobUrl = URL.createObjectURL(mergedBlob);
-            
-            initUnity(blobUrl);
-            
-        } catch (err) {
-            console.error("Chunk loading failed:", err);
-            alert("Failed to load game data chunks.");
+            const blob = await response.blob();
+            chunkBlobs.push(blob);
+
+            let overallProgress = (i / CHUNK_COUNT) * 0.5;
+            progressFull.style.width = `${overallProgress * 100}%`;
         }
+
+        const finalBlob = new Blob(chunkBlobs, { type: "application/octet-stream" });
+        const blobUrl = URL.createObjectURL(finalBlob);
+        
+        console.log("Chunks merged successfully. Size:", finalBlob.size);
+        
+        initUnity(blobUrl);
+        
+    } catch (err) {
+        console.error("Chunk loading failed:", err);
+        alert("Critical Error: Could not assemble game files.");
+    }
+}
+
+function initUnity(dataUrl) {
+    UnityLoader.compatibilityCheck = function (e, t, r) { t(); };
+    
+    var gameInstance = UnityLoader.instantiate("gameContainer", "build/geo.json", {
+        onProgress: UnityProgress,
+        dataUrl: dataUrl 
+    });
+}
+
+var alertShown = false;
+function UnityProgress(gameInstance, progress) {
+    const loader = document.querySelector("#loader");
+    let percent_progress = 50 + (progress * 50);
+
+    if (!gameInstance.progress) {
+        gameInstance.progress = document.querySelector(".full");
     }
 
-    function initUnity(dataUrl) {
-        UnityLoader.compatibilityCheck = function (e, t, r) { t(); };
-        
-        var gameInstance = UnityLoader.instantiate("gameContainer", "build/geo.json", {
-            onProgress: UnityProgress,
-            dataUrl: dataUrl 
-        });
+    gameInstance.progress.style.width = `${percent_progress}%`;
+
+    if (percent_progress >= 85 && !alertShown) {
+        alert("Start spamming ESC until the game loads to bypass the redirection");
+        alertShown = true;
     }
 
-    var alertShown = false;
-    function UnityProgress(gameInstance, progress) {
-        const loader = document.querySelector("#loader");
-        let percent_progress = 50 + (progress * 50);
-
-        if (!gameInstance.progress) {
-            gameInstance.progress = document.querySelector(".full");
-        }
-
-        gameInstance.progress.style.width = `${percent_progress}%`;
-
-        if (percent_progress >= 85 && !alertShown) {
-            alert("Start spamming ESC until the game loads to bypass the redirection");
-            alertShown = true;
-        }
-
-        if (progress === 1 && !gameInstance.removeTimeout) {
-            gameInstance.removeTimeout = setTimeout(function () {
-                loader.style.display = "none";
-            }, 2000);
-        }
+    if (progress === 1 && !gameInstance.removeTimeout) {
+        gameInstance.removeTimeout = setTimeout(function () {
+            loader.style.display = "none";
+        }, 2000);
     }
+}
 
-    loadAndMergeChunks();
+loadAndMergeChunks();
 </script>
 </body>
 </html>
