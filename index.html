@@ -207,7 +207,7 @@ const JSON_URL = "build/geo.json";
 async function loadAndMergeChunks() {
     const progressFull = document.querySelector(".full");
     document.querySelector(".progress").style.display = "block";
-    document.getElementById("spinner").style.display = "none";
+    document.querySelector(".spinner").style.display = "none";
 
     try {
         const jsonResponse = await fetch(JSON_URL);
